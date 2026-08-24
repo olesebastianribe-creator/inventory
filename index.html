@@ -256,7 +256,7 @@ async function connectFirebase(cfg, { migrate } = {}) {
         await ensureRole(u);
         if (fb.pendingMigrate) { fb.pendingMigrate = false; await migrateLocal(); }
         startListeners();
-        fb.status = 'Signed in: ' + fb.roleName + ' (' + (fb.role === 'admin' ? 'administrator' : 'seller') + ')';
+        fb.status = 'Signed in: ' + fb.roleName + ' (' + (u.isAnonymous ? 'guest' : (fb.role === 'admin' ? 'administrator' : 'seller')) + ')';
       } catch (e) { fb.status = 'Error: ' + e.message; }
     } else {
       fb.role = null; fb.roleName = '';
@@ -268,6 +268,12 @@ async function connectFirebase(cfg, { migrate } = {}) {
 }
 
 async function ensureRole(u) {
+  if (u.isAnonymous) {
+    fb.role = 'selger';
+    fb.roleName = device.user || 'Guest';
+    setTimeout(() => { if (!device.user) openUserPick(); }, 500);
+    return;
+  }
   const ref = fb.db.collection('roles').doc(u.uid);
   const snap = await ref.get();
   if (snap.exists) {
@@ -336,6 +342,10 @@ function loginErrTxt(e) {
   if (c.includes('operation-not-allowed')) return 'Email sign-in is not enabled in Firebase. See the setup guide (Authentication → Email/Password).';
   if (c.includes('too-many-requests')) return 'Too many attempts – wait a moment and try again.';
   return 'Something went wrong: ' + (e.message || c);
+}
+async function doGuest() {
+  try { await fb.auth.signInAnonymously(); }
+  catch (e) { alert(loginErrTxt(e)); }
 }
 function setLoginMode(m) { loginMode = m; render(); }
 async function doLogout() {
@@ -646,7 +656,11 @@ async function delProduct(id) {
 
 /* ---- User ---- */
 function requireUser() {
-  if (fb.connected) return !!fb.user;
+  if (fb.connected) {
+    if (!fb.user) return false;
+    if (fb.user.isAnonymous && !device.user) { openUserPick(); return false; }
+    return true;
+  }
   if (device.user) return true;
   openUserPick();
   return false;
@@ -664,6 +678,7 @@ function openUserPick() {
 async function pickUser(name) {
   name = (name || '').trim(); if (!name) return;
   device.user = name; saveDevice();
+  if (fb.user && fb.user.isAnonymous) { fb.roleName = name; fb.status = 'Signed in: ' + name + ' (guest)'; }
   if (!state.settings.users.includes(name)) {
     const s = { ...state.settings, users: [...state.settings.users, name] };
     await Store.saveSettings(s);
@@ -724,6 +739,7 @@ function vLogin() {
         <button class="btn sec" onclick="setLoginMode('${reg ? 'login' : 'register'}')">${reg ? 'Have an account? Sign in' : 'New user? Register'}</button>
         ${reg ? '' : '<button class="btn sec" onclick="doPwReset()">Forgot password</button>'}
       </div>
+      ${reg ? '' : '<div class="btnrow"><button class="btn accent" onclick="doGuest()">Continue without account</button></div>'}
     </div>
     <p class="note" style="text-align:center">Wrong database? <span class="linkish" onclick="disconnectFb()">Disconnect sync</span></p>`;
 }
@@ -823,7 +839,7 @@ function vHistorikk() {
 function vMer() {
   if (moreView === 'etiketter' && isAdmin()) return vEtiketter();
   if (moreView === 'innstillinger' && isAdmin()) return vInnstillinger();
-  const me = fb.connected ? `<div class="card"><h3>${fb.role === 'admin' ? '🛠️' : '👤'} ${esc(fb.roleName)}</h3><p class="note">${esc(fb.user.email)} · ${fb.role === 'admin' ? 'Administrator' : 'Seller'}</p><div class="btnrow"><button class="btn sec" onclick="doLogout()">Sign out</button></div></div>` : '';
+  const me = fb.connected ? `<div class="card"><h3>${fb.role === 'admin' ? '🛠️' : '👤'} ${esc(fb.roleName)}</h3><p class="note">${esc(fb.user.email || 'No account')} · ${fb.user.isAnonymous ? 'Guest' : (fb.role === 'admin' ? 'Administrator' : 'Seller')}</p><div class="btnrow"><button class="btn sec" onclick="doLogout()">Sign out</button></div></div>` : '';
   if (!isAdmin()) return me + '<p class="note" style="text-align:center">Labels, prices and settings are managed by the administrator.</p>';
   return me + `
     <div class="card" onclick="goMore('etiketter')" style="cursor:pointer"><h3>🏷️ Labels</h3><p class="note">Create QR sticker sheets for printing</p></div>
