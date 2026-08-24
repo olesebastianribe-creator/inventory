@@ -815,6 +815,14 @@ function vOkonomi() {
     <button class="btn sec" onclick="exportCSV()">⬇️ Download sales log (CSV)</button>`;
 }
 
+async function undoMovement(id) {
+  if (!isAdmin()) return;
+  const m = state.movements.find(x => x.id === id); if (!m) return;
+  if (!confirm('Undo this entry? Stock and finance figures are restored automatically.')) return;
+  if (fb.connected) await fb.db.collection('movements').doc(id).delete();
+  else { state.movements = state.movements.filter(x => x.id !== id); saveLocal(); render(); }
+  toastDone('Entry undone');
+}
 function vHistorikk() {
   const P = id => state.products.find(p => p.id === id) || { name: '(deleted product)' };
   const typeTxt = { salg: 'Sale', flytt: 'Move', inn: 'Stock in', gratis: 'Free', svinn: 'Loss', juster: 'Adjust' };
@@ -830,7 +838,7 @@ function vHistorikk() {
     else line = what;
     return `<div class="mv"><span class="tag ${m.type}">${typeTxt[m.type] || m.type}</span>${line}
       ${m.reason ? `<div class="t">Reason: ${esc(m.reason)}</div>` : ''}
-      <div class="t">👤 ${esc(m.user || 'Unknown')} · ${fmtTime(m.ts)}</div></div>`;
+      <div class="t">👤 ${esc(m.user || 'Unknown')} · ${fmtTime(m.ts)}${isAdmin() ? ` · <span class="linkish" onclick="undoMovement('${m.id}')">Undo</span>` : ''}</div></div>`;
   }).join('');
   return `<div class="card">${rows || '<p class="note">No activity yet. Everything that is scanned and registered shows up here.</p>'}</div>`;
 }
