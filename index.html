@@ -156,6 +156,7 @@ function defaultSettings() {
 }
 
 let state = { settings: defaultSettings(), products: [], movements: [], roles: [] };
+const DEFAULT_FB_CONFIG = {apiKey:"AIzaSyCvbk3aeRTuxAsu-W6z9kYR78zSQgYTu5c",authDomain:"inventory-app-34171.firebaseapp.com",projectId:"inventory-app-34171",storageBucket:"inventory-app-34171.firebasestorage.app",messagingSenderId:"42276397614",appId:"1:42276397614:web:7bc718323f7ad4d0f275bf"};
 let device = { user: '', fbConfig: null, defaultLoc: '' };
 let fb = { db: null, auth: null, user: null, role: null, roleName: '', connected: false, listening: false, pendingMigrate: false, status: 'Local mode (this device only)' };
 let view = 'oversikt';
@@ -1070,6 +1071,7 @@ function download(name, content, type) {
 /* ---------- Startup ---------- */
 window.addEventListener('load', async () => {
   loadLocal();
+  if (!device.fbConfig) device.fbConfig = DEFAULT_FB_CONFIG;
   if (device.fbConfig) {
     try { await connectFirebase(device.fbConfig, { migrate: false }); return; }
     catch (e) { fb.status = 'Offline (' + e.message + ') – using local data'; }
