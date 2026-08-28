@@ -503,7 +503,7 @@ async function confirmAdjust(pid) {
   if (!requireUser()) return;
   const st = stockMap(state.movements)[pid] || {};
   const reason = ($('#adjReason').value || '').trim() || 'Manual adjustment';
-  const inputs = $('input[data-adjloc]');
+  const inputs = $$('input[data-adjloc]');
   let n = 0;
   for (const inp of inputs) {
     const loc = inp.dataset.adjloc;
